@@ -91,12 +91,11 @@
     target))
 
 ;;;###autoload
-(define-derived-mode chatgpt-mode comint-mode "ChatGPT"
+(define-derived-mode chatgpt-mode fundamental-mode "ChatGPT"
   "Major mode for `chatgpt-mode'.
 
 \\<chatgpt-mode-map>"
-  (setq comint-prompt-regexp cassandra-prompt-regexp
-        comint-prompt-read-only t))
+  )
 
 ;;;###autoload
 (defun chatgpt-new ()
