@@ -9,6 +9,7 @@
 ## 🔗 References
 
 - [ChatGPT.el](https://github.com/joshcho/ChatGPT.el)
+- [gptel](https://github.com/karthink/gptel)
 
 ## Contribute
 

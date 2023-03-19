@@ -90,7 +90,7 @@ Display buffer from BUFFER-OR-NAME."
   (pop-to-buffer buffer-or-name `((display-buffer-in-direction)
                                   (dedicated . t))))
 
-(defun chatgpt--get-user ()
+(defun chatgpt-user ()
   "Return the current user."
   (if (string-empty-p openai-user)
       "user"  ; this is free?
@@ -193,13 +193,39 @@ The data is consist of ROLE and CONTENT."
 ;;
 ;;; Display
 
+(defun chatgpt--render-markdown (content)
+  "Render CONTENT in markdown."
+  (if (featurep 'markdown-mode)
+      (with-temp-buffer
+        (delay-mode-hooks (markdown-mode))
+        (insert content)
+        (font-lock-ensure)
+        (buffer-string))
+    content))
+
+(defun chatgpt--fill-region (start end)
+  "Like function `fill-region' (START to END), improve readability."
+  (save-restriction
+    (narrow-to-region start end)
+    (goto-char (point-min))
+    (while (not (eobp))
+      (end-of-line)
+      (when (< fill-column (current-column))
+        (fill-region (line-beginning-position) (line-end-position)))
+      (forward-line 1))))
+
 (defun chatgpt--display-messages ()
   "Display all messages to latest response."
   (while (< chatgpt--display-pointer (length chatgpt-chat-history))
     (let ((message (elt chatgpt-chat-history chatgpt--display-pointer)))
       (let-alist message
-        (insert .role ": " .content)
-        (insert "\n\n")))
+        (goto-char (point-max))
+        (let ((start (point))
+              (content (chatgpt--render-markdown .content))
+              (is-user (string= (chatgpt-user) .role)))
+          (insert "<" .role ">: " content)
+          (insert "\n\n")
+          (chatgpt--fill-region start (point)))))
     (cl-incf chatgpt--display-pointer)))
 
 (defun chatgpt-type-response ()
@@ -210,7 +236,7 @@ The data is consist of ROLE and CONTENT."
     (message "[BUSY] Waiting for OpanAI to response..."))
    (t
     (let ((response (read-string "Type response: "))
-          (user (chatgpt--get-user))
+          (user (chatgpt-user))
           (instance chatgpt-instance))
       (chatgpt--add-message user response)  ; add user's response
       (chatgpt-with-instance instance
@@ -248,19 +274,23 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-info ()
   "Show session information."
   (interactive)
-  (lv-message
-   (concat
-    (format "model: %s" chatgpt-model) "\n"
-    (format "prompt_tokens: %s | completion_tokens: %s | total_tokens: %s"
-            (ht-get chatgpt-data 'prompt_tokens 0)
-            (ht-get chatgpt-data 'completion_tokens 0)
-            (ht-get chatgpt-data 'total_tokens 0))
-    "\n"
-    (format "max_tokens: %s" chatgpt-max-tokens) "\n"
-    (format "temperature: %s" chatgpt-temperature) "\n"
-    (format "user: %s" (chatgpt--get-user))))
-  ;; Register event to cancel lv window!
-  (add-hook 'pre-command-hook #'chatgpt--pre-command-once))
+  (when (eq major-mode 'chatgpt-mode)
+    (lv-message
+     (concat
+      (format "session: %s" (cdr chatgpt-instance)) "\n"
+      (format "history size: %s" (length chatgpt-chat-history))
+      "\n\n"
+      (format "prompt_tokens: %s | completion_tokens: %s | total_tokens: %s"
+              (ht-get chatgpt-data 'prompt_tokens 0)
+              (ht-get chatgpt-data 'completion_tokens 0)
+              (ht-get chatgpt-data 'total_tokens 0))
+      "\n\n"
+      (format "model: %s" chatgpt-model) "\n"
+      (format "max_tokens: %s" chatgpt-max-tokens) "\n"
+      (format "temperature: %s" chatgpt-temperature) "\n"
+      (format "user: %s" (chatgpt-user))))
+    ;; Register event to cancel lv window!
+    (add-hook 'pre-command-hook #'chatgpt--pre-command-once)))
 
 ;;
 ;;; Entry
