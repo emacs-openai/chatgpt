@@ -34,6 +34,7 @@
 (require 'cl-lib)
 
 (require 'openai)
+(require 'let-alist)
 (require 'ht)
 
 (defgroup chatgpt nil
@@ -41,6 +42,11 @@
   :prefix "chatgpt-"
   :group 'comm
   :link '(url-link :tag "Repository" "https://github.com/emacs-openai/chatgpt"))
+
+(defcustom chatgpt-model "gpt-3.5-turbo"
+  "Model to use for chat."
+  :type 'string
+  :group 'chatgpt)
 
 (defcustom chatgpt-max-tokens 4000
   "The maximum number of tokens to generate in the completion."
@@ -67,6 +73,12 @@
 (defvar-local chatgpt-requesting-p nil
   "Non-nil when requesting; waiting for the response.")
 
+(defvar-local chatgpt-data (ht-create)
+  "Store other information other than messages.")
+
+(defvar-local chatgpt--display-pointer 0
+  "Display pointer.")
+
 ;;
 ;;; Util
 
@@ -84,13 +96,23 @@ Display buffer from BUFFER-OR-NAME."
     openai-user))
 
 ;;
-;;; Core
+;;; Instances
+
+(defmacro chatgpt-with-instance (instance &rest body)
+  "Execute BODY within instance."
+  (declare (indent 1))
+  `(when-let ((buffer (and ,instance
+                           (get-buffer (cdr ,instance)))))
+     (with-current-buffer buffer
+       (let ((inhibit-read-only t))
+         ,@body))))
 
 (defun chatgpt--live-instances ()
   "Return a list of live instances."
   (let ((live-instances))
     (ht-map (lambda (index buffer)
-              (when (get-buffer buffer)
+              (when (and (get-buffer buffer)
+                         (buffer-live-p buffer))
                 (push buffer live-instances)))
             chatgpt-instances)
     (reverse live-instances)))
@@ -109,7 +131,8 @@ Display buffer from BUFFER-OR-NAME."
   (let ((target))
     (cl-some (lambda (index)
                (let ((buffer (ht-get chatgpt-instances index)))
-                 (unless (get-buffer buffer)  ; if buffer is killed
+                 (when (or (not (get-buffer buffer))
+                           (not (buffer-live-p buffer)))  ; if buffer is killed
                    (setq target index)
                    t)))
              (ht-keys chatgpt-instances))
@@ -117,27 +140,92 @@ Display buffer from BUFFER-OR-NAME."
       (setq target (ht-size chatgpt-instances)))  ; Create a new one!
     target))
 
-(defun chatgpt--display-message (instance message)
-  ""
-  (with-current-buffer (get-buffer (cdr instance))
-    (let ((inhibit-read-only t))
+(defun chatgpt-restart ()
+  "Restart session."
+  (interactive)
+  (let* ((instance chatgpt-instances)
+         (index    (car instance))
+         (buffer   (cdr instance))
+         (old-name))
+    ;; If buffer is alive, kill it!
+    (chatgpt-with-instance instance
+      (setq old-name (buffer-name))
+      (kill-this-buffer))
+    ;; `old-name' will remain `nil' if buffer is not killed or invalid!
+    (when old-name
+      (chatgpt-register-instance index old-name))))
 
-      )))
+;;
+;;; Core
+
+(defun chatgpt--add-tokens (data)
+  "Record all tokens information from DATA."
+  (let-alist data
+    (let-alist .usage
+      ;; First we get the current tokens,
+      (let ((prompt-tokens     (ht-get chatgpt-data 'prompt_tokens 0))
+            (completion-tokens (ht-get chatgpt-data 'completion_tokens 0))
+            (total-tokens      (ht-get chatgpt-data 'total_tokens 0)))
+        ;; Then we add it up!
+        (ht-set chatgpt-data 'prompt_tokens     (+ prompt-tokens     .prompt_tokens))
+        (ht-set chatgpt-data 'completion_tokens (+ completion-tokens .completion_tokens))
+        (ht-set chatgpt-data 'total_tokens      (+ total-tokens      .total_tokens))))))
+
+(defun chatgpt--add-message (role content)
+  "Add a message to history.
+
+The data is consist of ROLE and CONTENT."
+  (setq chatgpt-chat-history
+        (vconcat (or chatgpt-chat-history '[])
+                 `[((role    . ,role)
+                    (content . ,(string-trim content)))])))
+
+(defun chatgpt--add-response-messages (data)
+  "Add the message to history from DATA, and return the message itself."
+  (let-alist data
+    (mapc (lambda (choice)
+            (let-alist choice
+              (let-alist .message
+                (chatgpt--add-message .role .content))))
+          .choices)))
+
+;;
+;;; Display
+
+(defun chatgpt--display-messages ()
+  "Display all messages to latest response."
+  (while (< chatgpt--display-pointer (length chatgpt-chat-history))
+    (let ((message (elt chatgpt-chat-history chatgpt--display-pointer)))
+      (let-alist message
+        (insert .role ": " .content)
+        (insert "\n\n")))
+    (cl-incf chatgpt--display-pointer)))
 
 (defun chatgpt-type-response ()
-  ""
+  "Type response to OpenAI."
   (interactive)
-  (let ((response (read-string "Type response: "))
-        (instance chatgpt-instance))
-    (setq chatgpt-requesting-p t)
-    (openai-chat response
-                 (lambda (data)
-                   (let ((message ; TODO: ..
-                          ))
-                     (chatgpt--display-response instance message)))
-                 :max-tokens chatgpt-max-tokens
-                 :temperature chatgpt-temperature
-                 :user (chatgpt--get-user))))
+  (cond
+   (chatgpt-requesting-p
+    (message "[BUSY] Waiting for OpanAI to response..."))
+   (t
+    (let ((response (read-string "Type response: "))
+          (user (chatgpt--get-user))
+          (instance chatgpt-instance))
+      (chatgpt--add-message user response)  ; add user's response
+      (chatgpt-with-instance instance
+        (chatgpt--display-messages))        ; display it
+      (setq chatgpt-requesting-p t)
+      (openai-chat chatgpt-chat-history
+                   (lambda (data)
+                     (chatgpt-with-instance instance
+                       (setq chatgpt-requesting-p nil)
+                       (chatgpt--add-tokens data)
+                       (chatgpt--add-response-messages data)
+                       (chatgpt--display-messages)))
+                   :model chatgpt-model
+                   :max-tokens chatgpt-max-tokens
+                   :temperature chatgpt-temperature
+                   :user user)))))
 
 ;;
 ;;; Entry
@@ -155,6 +243,15 @@ Display buffer from BUFFER-OR-NAME."
 \\<chatgpt-mode-map>"
   (setq-local buffer-read-only t))
 
+(defun chatgpt-register-instance (index buffer-or-name)
+  "Register BUFFER-OR-NAME with INDEX as an instance.
+
+Caution, this will overwrite the existing instance!"
+  (ht-set chatgpt-instances index (get-buffer-create buffer-or-name))
+  (with-current-buffer buffer-or-name
+    (chatgpt-mode)
+    (setq chatgpt-instance (cons index (current-buffer)))))
+
 ;;;###autoload
 (defun chatgpt-new ()
   "Run a new instance of ChatGPT."
@@ -163,10 +260,7 @@ Display buffer from BUFFER-OR-NAME."
          (new-buffer-name (format chatgpt-buffer-name-format new-index)))
     (when (get-buffer new-buffer-name)
       (user-error "Internal Error: creating instance that already exists"))
-    (ht-set chatgpt-instances new-index (get-buffer-create new-buffer-name))
-    (with-current-buffer new-buffer-name
-      (setq chatgpt-instance (cons new-index (current-buffer)))
-      (chatgpt-mode 1))
+    (chatgpt-register-instance new-index new-buffer-name)
     (chatgpt--pop-to-buffer new-buffer-name)))
 
 ;;;###autoload
@@ -178,7 +272,7 @@ Display buffer from BUFFER-OR-NAME."
     (cond (shown-instances
            (chatgpt--pop-to-buffer (nth 0 shown-instances)))
           (live-instances
-           (chatgpt--pop-to-buffer (nth 0 shown-instances)))
+           (chatgpt--pop-to-buffer (nth 0 live-instances)))
           (t
            (chatgpt-new)))))
 
