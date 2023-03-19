@@ -6,7 +6,7 @@
 ;; Maintainer: Shen, Jen-Chieh <jcs090218@gmail.com>
 ;; URL: https://github.com/emacs-openai/chatgpt
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "26.1") (openai "0.1.0") (ht "2.0"))
+;; Package-Requires: ((emacs "26.1") (openai "0.1.0") (lv "0.0") (ht "2.0"))
 ;; Keywords: comm openai
 
 ;; This file is not part of GNU Emacs.
@@ -32,9 +32,10 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'let-alist)
 
 (require 'openai)
-(require 'let-alist)
+(require 'lv)
 (require 'ht)
 
 (defgroup chatgpt nil
@@ -226,6 +227,40 @@ The data is consist of ROLE and CONTENT."
                    :max-tokens chatgpt-max-tokens
                    :temperature chatgpt-temperature
                    :user user)))))
+
+;;
+;;; Info
+
+(defun chatgpt--pre-command-once (&rest _)
+  "One time pre-command after Easky command."
+  ;; XXX: We pass on to next post-command!
+  (remove-hook 'pre-command-hook #'chatgpt--pre-command-once)
+  (add-hook 'post-command-hook #'chatgpt--post-command-once))
+
+(defun chatgpt--post-command-once ()
+  "One time post-command after info command."
+  ;; XXX: This will allow us to scroll in the lv's window!
+  (unless (equal lv-wnd (selected-window))
+    ;; Once we select window other than lv's window, then we kill it!
+    (remove-hook 'post-command-hook #'chatgpt--post-command-once)
+    (lv-delete-window)))
+
+(defun chatgpt-info ()
+  "Show session information."
+  (interactive)
+  (lv-message
+   (concat
+    (format "model: %s" chatgpt-model) "\n"
+    (format "prompt_tokens: %s | completion_tokens: %s | total_tokens: %s"
+            (ht-get chatgpt-data 'prompt_tokens 0)
+            (ht-get chatgpt-data 'completion_tokens 0)
+            (ht-get chatgpt-data 'total_tokens 0))
+    "\n"
+    (format "max_tokens: %s" chatgpt-max-tokens) "\n"
+    (format "temperature: %s" chatgpt-temperature) "\n"
+    (format "user: %s" (chatgpt--get-user))))
+  ;; Register event to cancel lv window!
+  (add-hook 'pre-command-hook #'chatgpt--pre-command-once))
 
 ;;
 ;;; Entry
