@@ -6,6 +6,19 @@
 
 [![CI](https://github.com/emacs-openai/chatgpt/actions/workflows/test.yml/badge.svg)](https://github.com/emacs-openai/chatgpt/actions/workflows/test.yml)
 
+## 🔨 Usage
+
+WIP
+
+## 📝 Customization
+
+#### 🧪 Variables
+
+- `chatgpt-model` - ID of the model to use.
+- `chatgpt-max-tokens` - The maximum number of tokens to generate in the completion.
+- `chatgpt-temperature` - What sampling temperature to use.
+- `chatgpt-input-method` - Method to receive input.
+
 ## 🔗 References
 
 - [ChatGPT.el](https://github.com/joshcho/ChatGPT.el)
