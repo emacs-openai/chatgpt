@@ -80,6 +80,11 @@
 (defvar-local chatgpt--display-pointer 0
   "Display pointer.")
 
+(defface chatgpt-user
+  '((t :inherit font-lock-builtin-face))
+  "Face used for user."
+  :group 'chatgpt)
+
 ;;
 ;;; Util
 
@@ -220,10 +225,11 @@ The data is consist of ROLE and CONTENT."
     (let ((message (elt chatgpt-chat-history chatgpt--display-pointer)))
       (let-alist message
         (goto-char (point-max))
-        (let ((start (point))
-              (content (chatgpt--render-markdown .content))
-              (is-user (string= (chatgpt-user) .role)))
-          (insert "<" .role ">: " content)
+        (let* ((start (point))
+               (role (format "<%s>:" .role))
+               (content (chatgpt--render-markdown .content)))
+          (add-face-text-property 0 (length role) 'chatgpt-user nil role)
+          (insert role " " content)
           (insert "\n\n")
           (chatgpt--fill-region start (point)))))
     (cl-incf chatgpt--display-pointer)))
