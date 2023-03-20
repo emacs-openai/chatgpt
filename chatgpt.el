@@ -94,9 +94,23 @@
 ;;
 ;;; Util
 
+(defmacro chatgpt--with-no-redisplay (&rest body)
+  "Execute BODY without any redisplay execution."
+  (declare (indent 0) (debug t))
+  `(let ((inhibit-redisplay t)
+         (inhibit-modification-hooks t)
+         after-focus-change-function
+         buffer-list-update-hook
+         display-buffer-alist
+         window-configuration-change-hook
+         window-scroll-functions
+         window-size-change-functions
+         window-state-change-hook)
+     ,@body))
+
 (defun chatgpt--kill-buffer (buffer-or-name)
-  "Like function `kill-buffer' but in the safe way."
-  (when-let ((buffer (get-buffer chatgpt-input-buffer-name)))
+  "Like function `kill-buffer' (BUFFER-OR-NAME) but in the safe way."
+  (when-let ((buffer (get-buffer buffer-or-name)))
     (when (buffer-live-p buffer)
       (kill-buffer buffer))))
 
@@ -128,7 +142,7 @@ Display buffer from BUFFER-OR-NAME."
 (defun chatgpt--live-instances ()
   "Return a list of live instances."
   (let ((live-instances))
-    (ht-map (lambda (index buffer)
+    (ht-map (lambda (_ buffer)
               (when (and (get-buffer buffer)
                          (buffer-live-p buffer))
                 (push buffer live-instances)))
@@ -139,7 +153,7 @@ Display buffer from BUFFER-OR-NAME."
   "Return a list of live instances that are displayed on the screen."
   (let ((live-instances (chatgpt--live-instances))
         (shown-instances))
-    (dolist (instance shown-instances)
+    (dolist (instance live-instances)
       (when (get-buffer-window instance)
         (push instance shown-instances)))
     (reverse shown-instances)))
@@ -163,7 +177,6 @@ Display buffer from BUFFER-OR-NAME."
   (interactive)
   (let* ((instance chatgpt-instances)
          (index    (car instance))
-         (buffer   (cdr instance))
          (old-name))
     ;; If buffer is alive, kill it!
     (chatgpt-with-instance instance
@@ -298,12 +311,15 @@ The data is consist of ROLE and CONTENT."
   (let ((dir (if (window-parameter nil 'window-side)
                  'bottom 'down))
         (buffer (get-buffer-create chatgpt-input-buffer-name)))
-    (with-current-buffer buffer
-      (chatgpt-input-mode)
-      (setq chatgpt-input-instance instance)
-      (erase-buffer)
-      (insert "Type response here...")
-      (mark-whole-buffer))  ; waiting for deletion
+    ;; XXX: Without this, the highlighting at the end wouldn't work!?
+    (chatgpt--with-no-redisplay
+      (with-current-buffer buffer
+        (chatgpt-input-mode)
+        (setq chatgpt-input-instance instance)
+        (erase-buffer)
+        (insert "Type response here...")
+        (call-interactively #'set-mark-command)
+        (goto-char (point-min))))  ; waiting for deletion
     (pop-to-buffer buffer `((display-buffer-in-direction)
                             (direction . ,dir)
                             (dedicated . t)
@@ -312,12 +328,13 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-input-send ()
   "Send the input."
   (interactive)
+  (user-error "fuk")
   (cond
    ((not (eq major-mode #'chatgpt-input-mode)) )  ; does nothing
    (chatgpt-requesting-p
     (message "[BUSY] Waiting for OpanAI to response..."))
    (t
-    (if (use-region-p)
+    (if (region-active-p)
         (delete-region (region-beginning) (region-end))
       (let ((response (buffer-string)))
         (chatgpt-with-instance chatgpt-input-instance
@@ -390,8 +407,9 @@ The data is consist of ROLE and CONTENT."
 ;;
 ;;; Entry
 
-(defun chatgpt-mode-kill-buffer ()
+(defun chatgpt-mode--kill-buffer-hook ()
   ""
+  ;; TODO: ..
   )
 
 (defvar chatgpt-mode-map
@@ -407,7 +425,7 @@ The data is consist of ROLE and CONTENT."
 \\<chatgpt-mode-map>"
   (setq-local buffer-read-only t)
   (font-lock-mode -1)
-  (add-hook 'kill-buffer-hook #'chatgpt-mode-kill-buffer nil t))
+  (add-hook 'kill-buffer-hook #'chatgpt-mode--kill-buffer-hook nil t))
 
 (defun chatgpt-register-instance (index buffer-or-name)
   "Register BUFFER-OR-NAME with INDEX as an instance.
