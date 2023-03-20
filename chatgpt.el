@@ -197,9 +197,9 @@ The data is consist of ROLE and CONTENT."
   "Render CONTENT in markdown."
   (if (featurep 'markdown-mode)
       (with-temp-buffer
-        (delay-mode-hooks (markdown-mode))
         (insert content)
-        (font-lock-ensure)
+        (delay-mode-hooks (markdown-mode))
+        (ignore-errors (font-lock-ensure))
         (buffer-string))
     content))
 
@@ -238,6 +238,8 @@ The data is consist of ROLE and CONTENT."
     (let ((response (read-string "Type response: "))
           (user (chatgpt-user))
           (instance chatgpt-instance))
+      (when (string-empty-p response)
+        (user-error "[INFO] Invalid response or instruction: %s" response))
       (chatgpt--add-message user response)  ; add user's response
       (chatgpt-with-instance instance
         (chatgpt--display-messages))        ; display it
@@ -306,7 +308,8 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-mode'.
 
 \\<chatgpt-mode-map>"
-  (setq-local buffer-read-only t))
+  (setq-local buffer-read-only t)
+  (font-lock-mode -1))
 
 (defun chatgpt-register-instance (index buffer-or-name)
   "Register BUFFER-OR-NAME with INDEX as an instance.
