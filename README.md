@@ -32,14 +32,14 @@ If you are using [use-package](https://www.emacswiki.org/emacs/UsePackage),
 add the following to your `init.el` file:
 
 ```elisp
-(use-package 'chatgpt :ensure t)
+(use-package chatgpt :ensure t)
 ```
 
 or with `straight.el`:
 
 ```elisp
-(use-package 'chatgpt
-  :straight ('chatgpt :type git :host github :repo "emacs-openai/'chatgpt"))
+(use-package chatgpt
+  :straight (chatgpt :type git :host github :repo "emacs-openai/chatgpt"))
 ```
 
 #### Manual installation
