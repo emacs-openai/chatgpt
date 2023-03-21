@@ -79,7 +79,7 @@
   :group 'openai)
 
 (defcustom chatgpt-display-tokens-info t
-  "Non-nil we display tokens infomration for each request."
+  "Non-nil we display tokens information for each request."
   :type 'boolean
   :group 'chatgpt)
 
@@ -129,6 +129,11 @@
   '((t :height 0.8 :foreground "#999999"))
   "Face added to codemetrics display."
   :group 'chatgpt)
+
+;;
+;;; Externals
+
+(declare-function shr-string-pixel-width "ext:shr.el")
 
 ;;
 ;;; Util
