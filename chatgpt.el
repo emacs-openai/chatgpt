@@ -6,7 +6,7 @@
 ;; Maintainer: Shen, Jen-Chieh <jcs090218@gmail.com>
 ;; URL: https://github.com/emacs-openai/chatgpt
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "26.1") (openai "0.1.0") (lv "0.0") (ht "2.0") (markdown-mode "2.1"))
+;; Package-Requires: ((emacs "26.1") (openai "0.1.0") (lv "0.0") (ht "2.0") (markdown-mode "2.1") (spinner "1.7.4"))
 ;; Keywords: comm openai
 
 ;; This file is not part of GNU Emacs.
@@ -38,6 +38,7 @@
 (require 'lv)
 (require 'ht)
 (require 'markdown-mode)
+(require 'spinner)
 
 (defgroup chatgpt nil
   "Use ChatGPT inside Emacs."
@@ -71,6 +72,22 @@
   :type 'boolean
   :group 'chatgpt)
 
+(defcustom chatgpt-spinner-type 'moon
+  "The type of the spinner."
+  :type '(choice (const :tag "Key to variable `spinner-types'" symbol)
+                 (const :tag "Vector of characters" vector))
+  :group 'openai)
+
+(defcustom chatgpt-display-tokens-info t
+  "Non-nil we display tokens infomration for each request."
+  :type 'boolean
+  :group 'chatgpt)
+
+(defcustom chatgpt-priority 100
+  "Overlays' priority."
+  :type 'integer
+  :group 'chatgpt)
+
 (defconst chatgpt-buffer-name-format "*ChatGPT: <%s>*"
   "Name of the buffer to use for the `chatgpt' instance.")
 
@@ -86,6 +103,12 @@
 (defvar-local chatgpt-requesting-p nil
   "Non-nil when requesting; waiting for the response.")
 
+(defvar-local chatgpt-spinner-counter 0
+  "Spinner counter.")
+
+(defvar-local chatgpt-spinner-timer nil
+  "Spinner timer.")
+
 (defvar-local chatgpt-data (ht-create)
   "Store other information other than messages.")
 
@@ -95,6 +118,16 @@
 (defface chatgpt-user
   '((t :inherit font-lock-builtin-face))
   "Face used for user."
+  :group 'chatgpt)
+
+(defface chatgpt-tip
+  '((t :foreground "#848484"))
+  "Face used for tip."
+  :group 'chatgpt)
+
+(defface chatgpt-info
+  '((t :height 0.8 :foreground "#999999"))
+  "Face added to codemetrics display."
   :group 'chatgpt)
 
 ;;
@@ -113,6 +146,26 @@
          window-size-change-functions
          window-state-change-hook)
      ,@body))
+
+;; TODO: Use function `string-pixel-width' after 29.1
+(defun chatgpt--string-pixel-width (str)
+  "Return the width of STR in pixels."
+  (if (fboundp #'string-pixel-width)
+      (string-pixel-width str)
+    (require 'shr)
+    (shr-string-pixel-width str)))
+
+(defun chatgpt--str-len (str)
+  "Calculate STR in pixel width."
+  (let ((width (frame-char-width))
+        (len (chatgpt--string-pixel-width str)))
+    (+ (/ len width)
+       (if (zerop (% len width)) 0 1))))  ; add one if exceeed
+
+(defun chatgpt--align (&rest lengths)
+  "Align sideline string by LENGTHS from the right of the window."
+  (list (* (window-font-width)
+           (+ (apply #'+ lengths) (if (display-graphic-p) 1 2)))))
 
 (defun chatgpt--kill-buffer (buffer-or-name)
   "Like function `kill-buffer' (BUFFER-OR-NAME) but in the safe way."
@@ -134,13 +187,32 @@ Display buffer from BUFFER-OR-NAME."
     openai-user))
 
 ;;
+;;; Spinner
+
+(defun chatgpt-mode--cancel-timer ()
+  "Cancel spinner timer."
+  (when (timerp chatgpt-spinner-timer)
+    (cancel-timer chatgpt-spinner-timer)))
+
+(defun chatgpt--start-spinner ()
+  "Start spinner."
+  (chatgpt-mode--cancel-timer)
+  (setq chatgpt-spinner-counter 0
+        chatgpt-spinner-timer (run-with-timer (/ spinner-frames-per-second 60.0)
+                                              (/ spinner-frames-per-second 60.0)
+                                              (lambda ()
+                                                (cl-incf chatgpt-spinner-counter)
+                                                (force-mode-line-update)))))
+
+;;
 ;;; Instances
 
 (defmacro chatgpt-with-instance (instance &rest body)
   "Execute BODY within instance."
   (declare (indent 1))
-  `(when-let ((buffer (and ,instance
-                           (get-buffer (cdr ,instance)))))
+  `(when-let* ((buffer (and ,instance
+                            (get-buffer (cdr ,instance))))
+               ((buffer-live-p buffer)))
      (with-current-buffer buffer
        (let ((inhibit-read-only t))
          ,@body))))
@@ -195,6 +267,30 @@ Display buffer from BUFFER-OR-NAME."
 ;;
 ;;; Core
 
+(defun chatgpt--get-face-height ()
+  "Make sure we get the face height."
+  (let ((height (face-attribute 'chatgpt-info :height)))
+    (if (numberp height) height
+      1)))
+
+(defun chatgpt--create-tokens-overlay (prompt-tokens completion-tokens total-tokens)
+  "Display tokens information."
+  (when chatgpt-display-tokens-info
+    (let* ((ov (make-overlay (1- (point)) (1- (point)) nil t t))
+           (content (format "prompt %s, completion %s, total: %s"
+                            prompt-tokens completion-tokens total-tokens))
+           (content-len (* (chatgpt--str-len content)
+                           (chatgpt--get-face-height)))
+           (str (concat
+                 (propertize " " 'display
+                             `((space :align-to (- right ,(chatgpt--align (1- content-len))))
+                               (space :width 0))
+                             `cursor t)
+                 (propertize content 'face 'chatgpt-info))))
+      (overlay-put ov 'chatgpt t)
+      (overlay-put ov 'priority chatgpt-priority)
+      (overlay-put ov 'after-string str))))
+
 (defun chatgpt--add-tokens (data)
   "Record all tokens information from DATA."
   (let-alist data
@@ -206,7 +302,9 @@ Display buffer from BUFFER-OR-NAME."
         ;; Then we add it up!
         (ht-set chatgpt-data 'prompt_tokens     (+ prompt-tokens     .prompt_tokens))
         (ht-set chatgpt-data 'completion_tokens (+ completion-tokens .completion_tokens))
-        (ht-set chatgpt-data 'total_tokens      (+ total-tokens      .total_tokens))))))
+        (ht-set chatgpt-data 'total_tokens      (+ total-tokens      .total_tokens))
+        ;; Render it!
+        (chatgpt--create-tokens-overlay .prompt_tokens .completion_tokens .total_tokens)))))
 
 (defun chatgpt--add-message (role content)
   "Add a message to history.
@@ -252,6 +350,8 @@ The data is consist of ROLE and CONTENT."
 
 (defun chatgpt--display-messages ()
   "Display all messages to latest response."
+  (when (zerop chatgpt--display-pointer)  ; clear up the tip message
+    (erase-buffer))
   (while (< chatgpt--display-pointer (length chatgpt-chat-history))
     (let ((message (elt chatgpt-chat-history chatgpt--display-pointer)))
       (let-alist message
@@ -280,13 +380,16 @@ The data is consist of ROLE and CONTENT."
     (chatgpt-with-instance instance
       (chatgpt--display-messages))        ; display it
     (setq chatgpt-requesting-p t)
+    (chatgpt--start-spinner)
     (openai-chat chatgpt-chat-history
                  (lambda (data)
                    (chatgpt-with-instance instance
                      (setq chatgpt-requesting-p nil)
-                     (chatgpt--add-tokens data)
-                     (chatgpt--add-response-messages data)
-                     (chatgpt--display-messages)))
+                     (chatgpt-mode--cancel-timer)
+                     (unless openai-error
+                       (chatgpt--add-response-messages data)
+                       (chatgpt--display-messages)
+                       (chatgpt--add-tokens data))))
                  :model chatgpt-model
                  :max-tokens chatgpt-max-tokens
                  :temperature chatgpt-temperature
@@ -366,7 +469,7 @@ The data is consist of ROLE and CONTENT."
 
 (defun chatgpt-input-header-line ()
   "The display for input header line."
-  (format " Session: %s" (cdr chatgpt-input-instance)))
+  (format " [Session] %s" (cdr chatgpt-input-instance)))
 
 (defvar chatgpt-input-mode-map
   (let ((map (make-sparse-keymap)))
@@ -375,7 +478,6 @@ The data is consist of ROLE and CONTENT."
     map)
   "Keymap for `chatgpt-mode'.")
 
-;;;###autoload
 (define-derived-mode chatgpt-input-mode fundamental-mode "ChatGPT Input"
   "Major mode for `chatgpt-input-mode'.
 
@@ -426,6 +528,8 @@ The data is consist of ROLE and CONTENT."
 
 (defun chatgpt-mode--kill-buffer-hook ()
   "Kill buffer hook."
+  (ht-clear chatgpt-data)
+  (chatgpt-mode--cancel-timer)
   (let ((instance chatgpt-instances))
     (when (get-buffer chatgpt-input-buffer-name)
       (with-current-buffer chatgpt-input-buffer-name
@@ -435,7 +539,16 @@ The data is consist of ROLE and CONTENT."
 
 (defun chatgpt-header-line ()
   "The display for header line."
-  (format " Session: %s, History: %s, User: %s (M-x chatgpt-info)"
+  (format " %s[Session] %s  [History] %s  [User] %s"
+          (if chatgpt-requesting-p
+              (let* ((spinner (if (symbolp chatgpt-spinner-type)
+                                  (cdr (assoc chatgpt-spinner-type spinner-types))
+                                chatgpt-spinner-type))
+                     (len (length spinner)))
+                (when (<= len chatgpt-spinner-counter)
+                  (setq chatgpt-spinner-counter 0))
+                (format "%s " (elt spinner chatgpt-spinner-counter)))
+            "")
           (cdr chatgpt-instance)
           (length chatgpt-chat-history)
           (chatgpt-user)))
@@ -446,6 +559,17 @@ The data is consist of ROLE and CONTENT."
     map)
   "Keymap for `chatgpt-mode'.")
 
+(defun chatgpt-mode-insert-tip ()
+  "Insert tip to output buffer."
+  (when (string-empty-p (buffer-string))
+    (let ((inhibit-read-only t)
+          (tip "Press <return> to start asking questions
+
+`M-x chatgpt-info` will print out more information about the current session!
+"))
+      (add-face-text-property 0 (length tip) 'chatgpt-tip nil tip)
+      (insert tip))))
+
 ;;;###autoload
 (define-derived-mode chatgpt-mode fundamental-mode "ChatGPT"
   "Major mode for `chatgpt-mode'.
@@ -454,7 +578,9 @@ The data is consist of ROLE and CONTENT."
   (setq-local buffer-read-only t)
   (font-lock-mode -1)
   (add-hook 'kill-buffer-hook #'chatgpt-mode--kill-buffer-hook nil t)
-  (setq-local header-line-format `((:eval (chatgpt-header-line)))))
+  (setq-local header-line-format `((:eval (chatgpt-header-line))))
+  (setq-local chatgpt-data (ht-create))
+  (chatgpt-mode-insert-tip))
 
 (defun chatgpt-register-instance (index buffer-or-name)
   "Register BUFFER-OR-NAME with INDEX as an instance.
