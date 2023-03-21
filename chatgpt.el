@@ -51,7 +51,7 @@
   :type 'string
   :group 'chatgpt)
 
-(defcustom chatgpt-max-tokens 4000
+(defcustom chatgpt-max-tokens 2000
   "The maximum number of tokens to generate in the completion."
   :type 'integer
   :group 'chatgpt)
