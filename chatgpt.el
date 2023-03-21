@@ -66,6 +66,11 @@
                  (const :tag "Read inside new window" window))
   :group 'chatgpt)
 
+(defcustom chatgpt-inhibit-input-afterward t
+  "Stop input after sending one."
+  :type 'boolean
+  :group 'chatgpt)
+
 (defconst chatgpt-buffer-name-format "*ChatGPT: <%s>*"
   "Name of the buffer to use for the `chatgpt' instance.")
 
@@ -311,9 +316,14 @@ The data is consist of ROLE and CONTENT."
 (defvar chatgpt-input-instance nil
   "The current instance; there is only one instance at a time.")
 
+(defun chatgpt-input-exit ()
+  "Exit the input."
+  (interactive)
+  (chatgpt--kill-buffer chatgpt-input-buffer-name))
+
 (defun chatgpt--start-input (instance)
   "Start input from INSTANCE."
-  (chatgpt--kill-buffer chatgpt-input-buffer-name)  ; singleton
+  (chatgpt-input-exit)
   (let ((dir (if (window-parameter nil 'window-side)
                  'bottom 'down))
         (buffer (get-buffer-create chatgpt-input-buffer-name)))
@@ -338,13 +348,15 @@ The data is consist of ROLE and CONTENT."
    ((not (eq major-mode #'chatgpt-input-mode)) )  ; does nothing
    (chatgpt-requesting-p
     (message "[BUSY] Waiting for OpanAI to response..."))
+   ((region-active-p)
+    (delete-region (region-beginning) (region-end)))
    (t
-    (if (region-active-p)
-        (delete-region (region-beginning) (region-end))
-      (let ((response (buffer-string)))
-        (chatgpt-with-instance chatgpt-input-instance
-          (chatgpt-send-response response))
-        (erase-buffer))))))
+    (let ((response (buffer-string)))
+      (chatgpt-with-instance chatgpt-input-instance
+        (chatgpt-send-response response))
+      (erase-buffer))
+    (when chatgpt-inhibit-input-afterward
+      (chatgpt-input-exit)))))
 
 (defun chatgpt-input--post-command ()
   "Execution after input."
