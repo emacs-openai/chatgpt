@@ -258,16 +258,18 @@ Display buffer from BUFFER-OR-NAME."
 (defun chatgpt-restart ()
   "Restart session."
   (interactive)
-  (let* ((instance chatgpt-instances)
-         (index    (car instance))
-         (old-name))
-    ;; If buffer is alive, kill it!
-    (chatgpt-with-instance instance
-      (setq old-name (buffer-name))
-      (kill-this-buffer))
-    ;; `old-name' will remain `nil' if buffer is not killed or invalid!
-    (when old-name
-      (chatgpt-register-instance index old-name))))
+  (when (eq major-mode #'chatgpt-mode)
+    (let* ((instance chatgpt-instance)
+           (index    (car instance))
+           (old-name))
+      ;; If buffer is alive, kill it!
+      (chatgpt-with-instance instance
+        (setq old-name (buffer-name))
+        (kill-this-buffer))
+      ;; `old-name' will remain `nil' if buffer is not killed or invalid!
+      (when old-name
+        (chatgpt-register-instance index old-name)
+        (switch-to-buffer old-name)))))
 
 ;;
 ;;; Core
