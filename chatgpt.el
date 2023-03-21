@@ -33,6 +33,7 @@
 
 (require 'cl-lib)
 (require 'let-alist)
+(require 'subr-x)
 
 (require 'openai)
 (require 'lv)
@@ -133,6 +134,7 @@
 ;;
 ;;; Externals
 
+(declare-function string-pixel-width "ext:subr-x.el")
 (declare-function shr-string-pixel-width "ext:shr.el")
 
 ;;
