@@ -132,6 +132,9 @@
 (defvar-local chatgpt-text-timer nil
   "Text timer for text animation.")
 
+(defvar-local chatgpt-animating-p nil
+  "Non-nil when animating text scroll.")
+
 (defface chatgpt-user
   '((t :inherit font-lock-builtin-face))
   "Face used for user."
@@ -386,7 +389,8 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt--cancel-text-timer ()
   "Cancel text timer."
   (chatgpt--cancel-timer chatgpt-text-timer)
-  (setq chatgpt-text-timer nil))
+  (setq chatgpt-text-timer nil
+        chatgpt-animating-p nil))
 
 (defun chatgpt--start-text-timer ()
   "Start text timer."
@@ -394,11 +398,12 @@ The data is consist of ROLE and CONTENT."
   (setq chatgpt-text-timer (run-with-timer (/ chatgpt-animate-fps 60.0)
                                            nil
                                            #'chatgpt--do-text-animatioin
-                                           chatgpt-instance)))
+                                           chatgpt-instance)
+        chatgpt-animating-p t))
 
 (defun chatgpt--do-text-animatioin (instance)
   "The main loop for text animation for the INSTANCE."
-  (chatgpt-with-instance chatgpt-instance
+  (chatgpt-with-instance instance
     (chatgpt--cancel-text-timer)
     (let ((message (elt chatgpt-chat-history chatgpt--display-pointer)))
       (let-alist message
@@ -508,6 +513,8 @@ The data is consist of ROLE and CONTENT."
   (cond
    (chatgpt-requesting-p
     (message "[BUSY] Waiting for OpanAI to response..."))
+   (chatgpt-animating-p
+    (message "[BUSY] Waiting for animation to finish..."))
    (t
     (cl-case chatgpt-input-method
       (`minibuffer
