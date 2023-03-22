@@ -84,12 +84,14 @@ to insert a newline like a normal browser!
 
 #### 🧪 Variables
 
-- `chatgpt-model` - ID of the model to use.
-- `chatgpt-max-tokens` - The maximum number of tokens to generate in the completion.
-- `chatgpt-temperature` - What sampling temperature to use.
-- `chatgpt-input-method` - Method to receive input.
-- `chatgpt-spinner-type` - Type of the spinner.
-- `chatgpt-display-tokens-info` - Non-nil we display tokens information for each request.
+- `chatgpt-model` - ID of the model to use. (Default: `"gpt-3.5-turbo"`)
+- `chatgpt-max-tokens` - The maximum number of tokens to generate in the completion. (Default: `2000`)
+- `chatgpt-temperature` - What sampling temperature to use. (Default: `1.0`)
+- `chatgpt-input-method` - Method to receive input. (Default: `'window`)
+- `chatgpt-spinner-type` - Type of the spinner. (Default: `'moon`)
+- `chatgpt-display-tokens-info` - Non-nil we display tokens information for each request. (Default: `t`)
+- `chatgpt-animate-text` - Display text gradually instead of output it all at once. (Default: `t`)
+- `chatgpt-animate-fps` - Frame per seconds to display text animation. (Default: `5`)
 
 ## 🔗 References
 
