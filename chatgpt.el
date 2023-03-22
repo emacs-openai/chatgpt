@@ -239,7 +239,7 @@ Display buffer from BUFFER-OR-NAME."
 ;;; Instances
 
 (defmacro chatgpt-with-instance (instance &rest body)
-  "Execute BODY within instance."
+  "Execute BODY within INSTANCE."
   (declare (indent 1))
   `(when-let* ((buffer (and ,instance
                             (get-buffer (cdr ,instance))))
@@ -307,7 +307,10 @@ Display buffer from BUFFER-OR-NAME."
       1)))
 
 (defun chatgpt--create-tokens-overlay (prompt-tokens completion-tokens total-tokens)
-  "Display tokens information."
+  "Display tokens information.
+
+Arguments PROMPT-TOKENS, COMPLETION-TOKENS, and TOTAL-TOKENS are the tokens
+information we want to display."
   (when chatgpt-display-tokens-info
     (let* ((ov (make-overlay (1- (point)) (1- (point)) nil t t))
            (content (format "prompt %s, completion %s, total: %s"
@@ -415,12 +418,10 @@ The data is consist of ROLE and CONTENT."
                ;; markdown so we render it!
                (content (if is-user .content
                           (chatgpt--render-markdown .content)))
-               (full-content)  ; with `role'!
                (chunk)
                (text-pointer chatgpt--text-pointer)
                (done))
           (add-face-text-property 0 (length role) 'chatgpt-user nil role)
-          (setq full-content (concat role " " content "\n\n"))
           (with-temp-buffer  ; Get the chunk!
             ;; --- Standard output ---
             (insert role " " content)
