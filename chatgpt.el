@@ -96,7 +96,7 @@
 
 (defcustom chatgpt-animate-fps 5
   "Frame per seconds to display text animation."
-  :type 'boolean
+  :type 'integer
   :group 'chatgpt)
 
 (defconst chatgpt-buffer-name-format "*ChatGPT: <%s>*"
