@@ -6,7 +6,7 @@
 ;; Maintainer: Shen, Jen-Chieh <jcs090218@gmail.com>
 ;; URL: https://github.com/emacs-openai/chatgpt
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "26.1") (openai "0.1.0") (lv "0.0") (ht "2.0") (markdown-mode "2.1") (spinner "1.7.4"))
+;; Package-Requires: ((emacs "27.1") (openai "0.1.0") (lv "0.0") (ht "2.0") (markdown-mode "2.1") (spinner "1.7.4"))
 ;; Keywords: comm openai
 
 ;; This file is not part of GNU Emacs.
