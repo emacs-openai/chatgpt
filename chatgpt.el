@@ -114,11 +114,8 @@
 (defvar-local chatgpt-requesting-p nil
   "Non-nil when requesting; waiting for the response.")
 
-(defvar-local chatgpt-spinner-counter 0
-  "Spinner counter.")
-
-(defvar-local chatgpt-spinner-timer nil
-  "Spinner timer.")
+(defvar-local chatgpt-spinner nil
+  "Spinner.")
 
 (defvar-local chatgpt-data (ht-create)
   "Store other information other than messages.")
@@ -220,24 +217,6 @@ Display buffer from BUFFER-OR-NAME."
   (if (string-empty-p openai-user)
       "user"  ; this is free?
     openai-user))
-
-;;
-;;; Spinner
-
-(defun chatgpt--cancel-spinner ()
-  "Cancel spinner timer."
-  (chatgpt--cancel-timer chatgpt-spinner-timer)
-  (setq chatgpt-spinner-timer nil))
-
-(defun chatgpt--start-spinner ()
-  "Start spinner."
-  (chatgpt--cancel-spinner)
-  (setq chatgpt-spinner-counter 0
-        chatgpt-spinner-timer (run-with-timer (/ spinner-frames-per-second 60.0)
-                                              (/ spinner-frames-per-second 60.0)
-                                              (lambda ()
-                                                (cl-incf chatgpt-spinner-counter)
-                                                (force-mode-line-update)))))
 
 ;;
 ;;; Instances
@@ -456,7 +435,7 @@ The data is consist of ROLE and CONTENT."
             (setq chatgpt--text-pointer 1)))))
     (if (< chatgpt--display-pointer (length chatgpt-chat-history))
         (chatgpt--start-text-timer)
-      (chatgpt--cancel-spinner))))
+      (spinner-stop chatgpt-spinner))))
 
 (defun chatgpt--display-messages-at-once ()
   "If variable `chatgpt-animate-text' is nil, we display messages all at once."
@@ -484,7 +463,7 @@ The data is consist of ROLE and CONTENT."
     (erase-buffer))
   (if chatgpt-animate-text
       (unless (timerp chatgpt-text-timer)  ; when is already running, don't interfere it
-        (chatgpt--start-spinner)
+        (spinner-start chatgpt-spinner)
         (chatgpt--start-text-timer))
     (chatgpt--display-messages-at-once)))
 
@@ -499,12 +478,12 @@ The data is consist of ROLE and CONTENT."
       (let (chatgpt-animate-text)
         (chatgpt--display-messages)))        ; display it
     (setq chatgpt-requesting-p t)
-    (chatgpt--start-spinner)
+    (spinner-start chatgpt-spinner)
     (openai-chat chatgpt-chat-history
                  (lambda (data)
                    (chatgpt-with-instance instance
                      (setq chatgpt-requesting-p nil)
-                     (chatgpt--cancel-spinner)
+                     (spinner-stop chatgpt-spinner)
                      (unless openai-error
                        (chatgpt--add-response-messages data)
                        (chatgpt--display-messages)
@@ -650,7 +629,7 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-mode--kill-buffer-hook ()
   "Kill buffer hook."
   (ht-clear chatgpt-data)
-  (chatgpt--cancel-spinner)
+  (spinner-stop chatgpt-spinner)
   (chatgpt--cancel-text-timer)
   (let ((instance chatgpt-instances))
     (when (get-buffer chatgpt-input-buffer-name)
@@ -662,14 +641,8 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-header-line ()
   "The display for header line."
   (format " %s[Session] %s  [History] %s  [User] %s"
-          (if (chatgpt-busy-p)
-              (let* ((spinner (if (symbolp chatgpt-spinner-type)
-                                  (cdr (assoc chatgpt-spinner-type spinner-types))
-                                chatgpt-spinner-type))
-                     (len (length spinner)))
-                (when (<= len chatgpt-spinner-counter)
-                  (setq chatgpt-spinner-counter 0))
-                (format "%s " (elt spinner chatgpt-spinner-counter)))
+          (if-let ((frame (spinner-print chatgpt-spinner)))
+              (concat frame " ")
             "")
           (cdr chatgpt-instance)
           (length chatgpt-chat-history)
@@ -692,7 +665,6 @@ The data is consist of ROLE and CONTENT."
       (add-face-text-property 0 (length tip) 'chatgpt-tip nil tip)
       (insert tip))))
 
-;;;###autoload
 (define-derived-mode chatgpt-mode fundamental-mode "ChatGPT"
   "Major mode for `chatgpt-mode'.
 
@@ -701,6 +673,7 @@ The data is consist of ROLE and CONTENT."
   (font-lock-mode -1)
   (add-hook 'kill-buffer-hook #'chatgpt-mode--kill-buffer-hook nil t)
   (setq-local header-line-format `((:eval (chatgpt-header-line))))
+  (setq chatgpt-spinner (spinner-create chatgpt-spinner-type t))
   (setq-local chatgpt-data (ht-create))
   (chatgpt-mode-insert-tip))
 
