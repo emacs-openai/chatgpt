@@ -211,6 +211,10 @@ Display buffer from BUFFER-OR-NAME."
   (pop-to-buffer buffer-or-name `((display-buffer-in-direction)
                                   (dedicated . t))))
 
+(defun chatgpt-busy-p ()
+  "Return non-nil if session is busy."
+  (or chatgpt-requesting-p chatgpt-animating-p))
+
 (defun chatgpt-user ()
   "Return the current user."
   (if (string-empty-p openai-user)
@@ -450,8 +454,9 @@ The data is consist of ROLE and CONTENT."
                                               total-tokens))
             (cl-incf chatgpt--display-pointer)
             (setq chatgpt--text-pointer 1)))))
-    (when (< chatgpt--display-pointer (length chatgpt-chat-history))
-      (chatgpt--start-text-timer))))
+    (if (< chatgpt--display-pointer (length chatgpt-chat-history))
+        (chatgpt--start-text-timer)
+      (chatgpt--cancel-spinner-timer))))
 
 (defun chatgpt--display-messages-at-once ()
   "If variable `chatgpt-animate-text' is nil, we display messages all at once."
@@ -478,8 +483,10 @@ The data is consist of ROLE and CONTENT."
   (when (zerop chatgpt--display-pointer)  ; clear up the tip message
     (erase-buffer))
   (if chatgpt-animate-text
-      (unless (timerp chatgpt-text-timer)  ; when is already running, don't interfere it
-        (chatgpt--start-text-timer))
+      (progn
+        (chatgpt--start-spinner)
+        (unless (timerp chatgpt-text-timer)  ; when is already running, don't interfere it
+          (chatgpt--start-text-timer)))
     (chatgpt--display-messages-at-once)))
 
 (defun chatgpt-send-response (response)
@@ -656,7 +663,7 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-header-line ()
   "The display for header line."
   (format " %s[Session] %s  [History] %s  [User] %s"
-          (if chatgpt-requesting-p
+          (if (chatgpt-busy-p)
               (let* ((spinner (if (symbolp chatgpt-spinner-type)
                                   (cdr (assoc chatgpt-spinner-type spinner-types))
                                 chatgpt-spinner-type))
