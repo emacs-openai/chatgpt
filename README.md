@@ -13,7 +13,7 @@ to your questions, right within the editor.
 *P.S. This plugin focuses on experience with making conversations with ChatGPT!*
 
 <p align="center">
-<img alt="explain" src="./etc/demo.gif"/>
+<img alt="demo" src="./etc/demo.gif"/>
 </p>
 
 ## 💾 Installation
