@@ -483,10 +483,9 @@ The data is consist of ROLE and CONTENT."
   (when (zerop chatgpt--display-pointer)  ; clear up the tip message
     (erase-buffer))
   (if chatgpt-animate-text
-      (progn
+      (unless (timerp chatgpt-text-timer)  ; when is already running, don't interfere it
         (chatgpt--start-spinner)
-        (unless (timerp chatgpt-text-timer)  ; when is already running, don't interfere it
-          (chatgpt--start-text-timer)))
+        (chatgpt--start-text-timer))
     (chatgpt--display-messages-at-once)))
 
 (defun chatgpt-send-response (response)
