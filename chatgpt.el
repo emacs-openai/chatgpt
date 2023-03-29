@@ -224,14 +224,14 @@ Display buffer from BUFFER-OR-NAME."
 ;;
 ;;; Spinner
 
-(defun chatgpt--cancel-spinner-timer ()
+(defun chatgpt--cancel-spinner ()
   "Cancel spinner timer."
   (chatgpt--cancel-timer chatgpt-spinner-timer)
   (setq chatgpt-spinner-timer nil))
 
 (defun chatgpt--start-spinner ()
   "Start spinner."
-  (chatgpt--cancel-spinner-timer)
+  (chatgpt--cancel-spinner)
   (setq chatgpt-spinner-counter 0
         chatgpt-spinner-timer (run-with-timer (/ spinner-frames-per-second 60.0)
                                               (/ spinner-frames-per-second 60.0)
@@ -456,7 +456,7 @@ The data is consist of ROLE and CONTENT."
             (setq chatgpt--text-pointer 1)))))
     (if (< chatgpt--display-pointer (length chatgpt-chat-history))
         (chatgpt--start-text-timer)
-      (chatgpt--cancel-spinner-timer))))
+      (chatgpt--cancel-spinner))))
 
 (defun chatgpt--display-messages-at-once ()
   "If variable `chatgpt-animate-text' is nil, we display messages all at once."
@@ -504,7 +504,7 @@ The data is consist of ROLE and CONTENT."
                  (lambda (data)
                    (chatgpt-with-instance instance
                      (setq chatgpt-requesting-p nil)
-                     (chatgpt--cancel-spinner-timer)
+                     (chatgpt--cancel-spinner)
                      (unless openai-error
                        (chatgpt--add-response-messages data)
                        (chatgpt--display-messages)
@@ -650,7 +650,7 @@ The data is consist of ROLE and CONTENT."
 (defun chatgpt-mode--kill-buffer-hook ()
   "Kill buffer hook."
   (ht-clear chatgpt-data)
-  (chatgpt--cancel-spinner-timer)
+  (chatgpt--cancel-spinner)
   (chatgpt--cancel-text-timer)
   (let ((instance chatgpt-instances))
     (when (get-buffer chatgpt-input-buffer-name)
