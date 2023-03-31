@@ -70,6 +70,8 @@ sidebar.
 
 ## 🔨 Usage
 
+Before you can use this package you will need to [set up your API key](https://github.com/emacs-openai/openai#-usage) for openai library.
+
 To start this package:
 
 ```
