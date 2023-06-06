@@ -62,6 +62,11 @@
   :type 'number
   :group 'chatgpt)
 
+(defcustom chatgpt-top-p 1.0
+  "Nucleus sampling parameter."
+  :type 'number
+  :group 'chatgpt)
+
 (defcustom chatgpt-input-method 'window
   "The method receive input."
   :type '(choice (const :tag "Read from minibuffer" minibuffer)
@@ -491,6 +496,7 @@ The data is consist of ROLE and CONTENT."
                  :model chatgpt-model
                  :max-tokens chatgpt-max-tokens
                  :temperature chatgpt-temperature
+                 :top-p chatgpt-top-p
                  :user user)))
 
 (defun chatgpt-type-response ()
@@ -619,6 +625,7 @@ The data is consist of ROLE and CONTENT."
       (format "model: %s" chatgpt-model) "\n"
       (format "max_tokens: %s" chatgpt-max-tokens) "\n"
       (format "temperature: %s" chatgpt-temperature) "\n"
+      (format "top-p: %s" chatgpt-top-p)
       (format "user: %s" (chatgpt-user))))
     ;; Register event to cancel lv window!
     (add-hook 'pre-command-hook #'chatgpt--pre-command-once)))
