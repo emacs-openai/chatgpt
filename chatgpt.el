@@ -625,7 +625,7 @@ The data is consist of ROLE and CONTENT."
       (format "model: %s" chatgpt-model) "\n"
       (format "max_tokens: %s" chatgpt-max-tokens) "\n"
       (format "temperature: %s" chatgpt-temperature) "\n"
-      (format "top-p: %s" chatgpt-top-p)
+      (format "top-p: %s" chatgpt-top-p) "\n"
       (format "user: %s" (chatgpt-user))))
     ;; Register event to cancel lv window!
     (add-hook 'pre-command-hook #'chatgpt--pre-command-once)))
