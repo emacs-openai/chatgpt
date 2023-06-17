@@ -62,7 +62,7 @@
   :type 'number
   :group 'chatgpt)
 
-(defcustom chatgpt-top-p 1.0
+(defcustom chatgpt-top-p nil
   "Nucleus sampling parameter."
   :type 'number
   :group 'chatgpt)
