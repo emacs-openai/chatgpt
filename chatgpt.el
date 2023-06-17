@@ -110,6 +110,9 @@
 (defvar chatgpt-instances (ht-create)
   "List of instances, each pair is consist of (index . buffer).")
 
+(defvar-local chatgpt--user-prompt "Type response here..."
+  "Prompt shown to the user in the chat input buffer.")
+
 (defvar-local chatgpt-instance nil
   "Instance data for each buffer.")
 
@@ -510,7 +513,7 @@ The data is consist of ROLE and CONTENT."
    (t
     (cl-case chatgpt-input-method
       (`minibuffer
-       (chatgpt-send-response (read-string "Type response: ")))
+       (chatgpt-send-response (read-string chatgpt--user-prompt)))
       (`window
        (chatgpt--start-input chatgpt-instance))
       (t
@@ -542,7 +545,7 @@ The data is consist of ROLE and CONTENT."
         (chatgpt-input-mode)
         (setq chatgpt-input-instance instance)
         (erase-buffer)
-        (insert "Type response here...")
+        (insert chatgpt--user-prompt)
         (call-interactively #'set-mark-command)
         (goto-char (point-min))))  ; waiting for deletion
     (pop-to-buffer buffer `((display-buffer-in-direction)
@@ -584,11 +587,19 @@ The data is consist of ROLE and CONTENT."
     map)
   "Keymap for `chatgpt-mode'.")
 
+(defun chatgpt--delete-prompt-if-present ()
+  "Delete the prompt text after the user starts typing."
+  (when (string= (buffer-substring-no-properties (point) (point-max))
+                 chatgpt--user-prompt)
+    (delete-region (point) (point-max)))
+  (remove-hook 'post-self-insert-hook #'chatgpt--delete-prompt-if-present))
+
 (define-derived-mode chatgpt-input-mode fundamental-mode "ChatGPT Input"
   "Major mode for `chatgpt-input-mode'.
 
 \\<chatgpt-input-mode-map>"
   (setq-local header-line-format `((:eval (chatgpt-input-header-line))))
+  (add-hook 'post-self-insert-hook #'chatgpt--delete-prompt-if-present)
   (add-hook 'post-command-hook #'chatgpt-input--post-command nil t))
 
 ;;
