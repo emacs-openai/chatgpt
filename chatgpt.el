@@ -73,6 +73,11 @@
                  (const :tag "Read inside new window" window))
   :group 'chatgpt)
 
+(defcustom chatgpt-window-prompt "Type response here..."
+  "Text inserted when window is created."
+  :type 'string
+  :group 'chatgpt)
+
 (defcustom chatgpt-inhibit-input-afterward t
   "Stop input after sending one."
   :type 'boolean
