@@ -73,6 +73,11 @@
                  (const :tag "Read inside new window" window))
   :group 'chatgpt)
 
+(defcustom chatgpt-window-prompt "Type response here..."
+  "Text inserted when window is created."
+  :type 'string
+  :group 'chatgpt)
+
 (defcustom chatgpt-inhibit-input-afterward t
   "Stop input after sending one."
   :type 'boolean
@@ -542,7 +547,7 @@ The data is consist of ROLE and CONTENT."
         (chatgpt-input-mode)
         (setq chatgpt-input-instance instance)
         (erase-buffer)
-        (insert "Type response here...")
+        (insert chatgpt-window-prompt)
         (call-interactively #'set-mark-command)
         (goto-char (point-min))))  ; waiting for deletion
     (pop-to-buffer buffer `((display-buffer-in-direction)
@@ -625,7 +630,7 @@ The data is consist of ROLE and CONTENT."
       (format "model: %s" chatgpt-model) "\n"
       (format "max_tokens: %s" chatgpt-max-tokens) "\n"
       (format "temperature: %s" chatgpt-temperature) "\n"
-      (format "top-p: %s" chatgpt-top-p)
+      (format "top-p: %s" chatgpt-top-p) "\n"
       (format "user: %s" (chatgpt-user))))
     ;; Register event to cancel lv window!
     (add-hook 'pre-command-hook #'chatgpt--pre-command-once)))
