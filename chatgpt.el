@@ -121,6 +121,9 @@
 (defvar-local chatgpt-chat-history nil
   "The chat history use to send request.")
 
+(defvar-local chatgpt-chat-points nil
+  "Buffer points every time we add a new message.")
+
 (defvar-local chatgpt-requesting-p nil
   "Non-nil when requesting; waiting for the response.")
 
@@ -227,6 +230,10 @@ Display buffer from BUFFER-OR-NAME."
   (if (string-empty-p openai-user)
       "user"  ; this is free?
     openai-user))
+
+(defun chatgpt-chat-points ()
+  "Return chat points in correct order."
+  (reverse chatgpt-chat-points))
 
 ;;
 ;;; Instances
@@ -340,10 +347,17 @@ information we want to display."
         (unless chatgpt-animate-text
           (chatgpt--create-tokens-overlay .prompt_tokens .completion_tokens .total_tokens))))))
 
+(defun chatgpt--add-chat-point ()
+  "Add a chat point."
+  (if chatgpt-chat-points
+      (push (point-max) chatgpt-chat-points)
+    (push (point-min) chatgpt-chat-points)))
+
 (defun chatgpt--add-message (role content)
   "Add a message to history.
 
 The data is consist of ROLE and CONTENT."
+  (chatgpt--add-chat-point)
   (setq chatgpt-chat-history
         (vconcat (or chatgpt-chat-history '[])
                  `[((role    . ,role)
@@ -681,6 +695,7 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-mode'.
 
 \\<chatgpt-mode-map>"
+  (buffer-disable-undo)
   (setq-local buffer-read-only t)
   (font-lock-mode -1)
   (add-hook 'kill-buffer-hook #'chatgpt-mode--kill-buffer-hook nil t)
