@@ -273,7 +273,6 @@ Display buffer from BUFFER-OR-NAME."
     (while (< index (length chatgpt-chat-points))
       (setq pt (nth index chatgpt-chat-points))
       (when (< start pt)
-        (jcs-print "? " start pt delta)
         (setf (nth index chatgpt-chat-points) (+ pt delta)))
       (cl-incf index))))
 
