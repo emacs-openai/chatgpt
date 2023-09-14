@@ -231,9 +231,41 @@ Display buffer from BUFFER-OR-NAME."
       "user"  ; this is free?
     openai-user))
 
+;;
+;;; Chat Point
+
 (defun chatgpt-chat-points ()
   "Return chat points in correct order."
   (reverse chatgpt-chat-points))
+
+(defun chatgpt-current-chat-point ()
+  "Return current chat point."
+  (let ((chat-point))
+    (cl-some (lambda (pt)
+               (when (<= pt (point))
+                 (setq chat-point pt)))
+             chatgpt-chat-points)
+    chat-point))
+
+(defun chatgpt-chat-point-index (chat-point)
+  "Return CHAT-POINT's index."
+  (cl-position chat-point (chatgpt-chat-points)))
+
+(defun chatgpt-current-chat-point-index ()
+  "Return current chat point index."
+  (chatgpt-chat-point-index (chatgpt-current-chat-point)))
+
+(defun chatgpt-current-message ()
+  "Return current message."
+  (elt chatgpt-chat-history (chatgpt-current-chat-point-index)))
+
+(defun chatgpt-current-content ()
+  "Return current content."
+  (alist-get 'content (chatgpt-current-message)))
+
+(defun chatgpt-current-role ()
+  "Return current role."
+  (alist-get 'role (chatgpt-current-message)))
 
 ;;
 ;;; Instances
@@ -601,12 +633,94 @@ The data is consist of ROLE and CONTENT."
     (define-key map (kbd "S-<return>") #'newline)
     (define-key map (kbd "RET") #'chatgpt-input-send)
     map)
-  "Keymap for `chatgpt-mode'.")
+  "Keymap for `chatgpt-input-mode'.")
 
 (define-derived-mode chatgpt-input-mode fundamental-mode "ChatGPT Input"
   "Major mode for `chatgpt-input-mode'.
 
 \\<chatgpt-input-mode-map>"
+  :group chatgpt
+  (setq-local header-line-format `((:eval (chatgpt-input-header-line))))
+  (add-hook 'post-command-hook #'chatgpt-input--post-command nil t))
+
+;;
+;;; Edit
+
+(defconst chatgpt-edit-buffer-name "*ChatGPT-Edit*"
+  "Buffer name to receive edit.")
+
+(defvar chatgpt-edit-instance nil
+  "The current instance; there is only one instance at a time.")
+
+(defvar chatgpt-edit-char-point-index nil
+  "Store the char point index.")
+
+(defun chatgpt-edit-exit ()
+  "Exit the edit."
+  (interactive)
+  (chatgpt--kill-buffer chatgpt-edit-buffer-name))
+
+(defun chatgpt-edit-start (instance)
+  "Start edit from INSTANCE."
+  (chatgpt-edit-exit)
+  (let ((dir (if (window-parameter nil 'window-side)
+                 'bottom 'down))
+        (buffer (get-buffer-create chatgpt-edit-buffer-name))
+        (content (chatgpt-current-content))
+        (index (chatgpt-current-chat-point-index)))
+    ;; XXX: Without this, the highlighting at the end wouldn't work!?
+    (chatgpt--with-no-redisplay
+      (with-current-buffer buffer
+        (chatgpt-edit-mode)
+        (setq chatgpt-edit-instance instance
+              chatgpt-edit-char-point-index index)
+        (erase-buffer)
+        (insert content)))
+    (pop-to-buffer buffer `((display-buffer-in-direction)
+                            (direction . ,dir)
+                            (dedicated . t)
+                            (window-height . fit-window-to-buffer)))))
+
+(defun chatgpt-edit-send ()
+  "Send the edit."
+  (interactive)
+  (cond
+   ((not (eq major-mode #'chatgpt-edit-mode)) )  ; do nothing
+   (chatgpt-requesting-p
+    (message "[BUSY] Waiting for OpanAI to response..."))
+   ((region-active-p)
+    (delete-region (region-beginning) (region-end)))
+   (t
+    (let ((response (buffer-string)))
+      (chatgpt-with-instance chatgpt-edit-instance
+        ;; Update display!
+        (let ((start (chatgpt-current-chat-point)))
+          (goto-char start)
+          (search-forward ": " (line-end-position) t)  ; XXX: Improve this!
+          (delete-region (point) (+ (point) (length (chatgpt-current-content))))
+          (insert response)
+          (chatgpt--fill-region start (point)))
+
+        ;; Update history!
+        (setf (elt chatgpt-chat-history chatgpt-edit-char-point-index)
+              `((role    . ,(chatgpt-user))
+                (content . ,(string-trim response)))))
+      (erase-buffer))
+    (when chatgpt-inhibit-input-afterward
+      (chatgpt-edit-exit)))))
+
+(defvar chatgpt-edit-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "S-<return>") #'newline)
+    (define-key map (kbd "RET") #'chatgpt-edit-send)
+    map)
+  "Keymap for `chatgpt-edit-mode'.")
+
+(define-derived-mode chatgpt-edit-mode fundamental-mode "ChatGPT Edit"
+  "Major mode for `chatgpt-edit-mode'.
+
+\\<chatgpt-edit-mode-map>"
+  :group chatgpt
   (setq-local header-line-format `((:eval (chatgpt-input-header-line))))
   (add-hook 'post-command-hook #'chatgpt-input--post-command nil t))
 
@@ -695,6 +809,7 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-mode'.
 
 \\<chatgpt-mode-map>"
+  :group chatgpt
   (buffer-disable-undo)
   (setq-local buffer-read-only t)
   (font-lock-mode -1)
