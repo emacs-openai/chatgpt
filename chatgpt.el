@@ -639,7 +639,6 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-input-mode'.
 
 \\<chatgpt-input-mode-map>"
-  :group chatgpt
   (setq-local header-line-format `((:eval (chatgpt-input-header-line))))
   (add-hook 'post-command-hook #'chatgpt-input--post-command nil t))
 
@@ -720,7 +719,6 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-edit-mode'.
 
 \\<chatgpt-edit-mode-map>"
-  :group chatgpt
   (setq-local header-line-format `((:eval (chatgpt-input-header-line))))
   (add-hook 'post-command-hook #'chatgpt-input--post-command nil t))
 
@@ -809,7 +807,6 @@ The data is consist of ROLE and CONTENT."
   "Major mode for `chatgpt-mode'.
 
 \\<chatgpt-mode-map>"
-  :group chatgpt
   (buffer-disable-undo)
   (setq-local buffer-read-only t)
   (font-lock-mode -1)
