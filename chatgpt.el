@@ -267,6 +267,16 @@ Display buffer from BUFFER-OR-NAME."
   "Return current role."
   (alist-get 'role (chatgpt-current-message)))
 
+(defun chatgpt-shift-chat-points (start delta)
+  "Shift all chat points after START by DELTA."
+  (let ((index 0) (pt))
+    (while (< index (length chatgpt-chat-points))
+      (setq pt (nth index chatgpt-chat-points))
+      (when (< start pt)
+        (jcs-print "? " start pt delta)
+        (setf (nth index chatgpt-chat-points) (+ pt delta)))
+      (cl-incf index))))
+
 ;;
 ;;; Instances
 
@@ -651,8 +661,8 @@ The data is consist of ROLE and CONTENT."
 (defvar chatgpt-edit-instance nil
   "The current instance; there is only one instance at a time.")
 
-(defvar chatgpt-edit-char-point-index nil
-  "Store the char point index.")
+(defvar chatgpt-edit-chat-point-index nil
+  "Store the chat point index.")
 
 (defun chatgpt-edit-exit ()
   "Exit the edit."
@@ -672,7 +682,7 @@ The data is consist of ROLE and CONTENT."
       (with-current-buffer buffer
         (chatgpt-edit-mode)
         (setq chatgpt-edit-instance instance
-              chatgpt-edit-char-point-index index)
+              chatgpt-edit-chat-point-index index)
         (erase-buffer)
         (insert content)))
     (pop-to-buffer buffer `((display-buffer-in-direction)
@@ -693,15 +703,19 @@ The data is consist of ROLE and CONTENT."
     (let ((response (buffer-string)))
       (chatgpt-with-instance chatgpt-edit-instance
         ;; Update display!
-        (let ((start (chatgpt-current-chat-point)))
+        (let* ((start (chatgpt-current-chat-point))
+               (old-len (length response))
+               (new-len (length (chatgpt-current-content)))
+               (diff (- old-len new-len)))
           (goto-char start)
-          (search-forward ": " (line-end-position) t)  ; XXX: Improve this!
-          (delete-region (point) (+ (point) (length (chatgpt-current-content))))
+          (search-forward ">: " (line-end-position) t)  ; XXX: Improve this!
+          (delete-region (point) (+ (point) new-len))
           (insert response)
-          (chatgpt--fill-region start (point)))
+          (chatgpt--fill-region start (point))
+          (chatgpt-shift-chat-points start diff))
 
         ;; Update history!
-        (setf (elt chatgpt-chat-history chatgpt-edit-char-point-index)
+        (setf (elt chatgpt-chat-history chatgpt-edit-chat-point-index)
               `((role    . ,(chatgpt-user))
                 (content . ,(string-trim response)))))
       (erase-buffer))
