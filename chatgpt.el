@@ -448,11 +448,11 @@ The data is consist of ROLE and CONTENT."
   (chatgpt--cancel-text-timer)
   (setq chatgpt-text-timer (run-with-timer (/ chatgpt-animate-fps 60.0)
                                            nil
-                                           #'chatgpt--do-text-animatioin
+                                           #'chatgpt--do-text-animation
                                            chatgpt-instance)
         chatgpt-animating-p t))
 
-(defun chatgpt--do-text-animatioin (instance)
+(defun chatgpt--do-text-animation (instance)
   "The main loop for text animation for the INSTANCE."
   (chatgpt-with-instance instance
     (chatgpt--cancel-text-timer)
