@@ -73,6 +73,12 @@
                  (const :tag "Read inside new window" window))
   :group 'chatgpt)
 
+(defcustom chatgpt-display-method nil
+  "The method to display buffer."
+  :type '(choice (const :tag "Target display function." function)
+                 (const :tag "Use default function." nil))
+  :group 'chatgpt)
+
 (defcustom chatgpt-window-prompt "Type response here..."
   "Text inserted when window is created."
   :type 'string
@@ -218,8 +224,10 @@
   "Wrapper to function `pop-to-buffer'.
 
 Display buffer from BUFFER-OR-NAME."
-  (pop-to-buffer buffer-or-name `((display-buffer-in-direction)
-                                  (dedicated . t))))
+  (if (functionp chatgpt-display-method)
+      (funcall chatgpt-display-method buffer-or-name)
+    (pop-to-buffer buffer-or-name `((display-buffer-in-direction)
+                                    (dedicated . t)))))
 
 (defun chatgpt-busy-p ()
   "Return non-nil if session is busy."
