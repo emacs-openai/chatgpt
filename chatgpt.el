@@ -189,6 +189,12 @@
          window-state-change-hook)
      ,@body))
 
+(defmacro chatgpt--with-buffer (buffer &rest body)
+  "Execute BODY with in BUFFER."
+  (declare (indent 1) (debug t))
+  `(when (get-buffer ,buffer)
+     (with-current-buffer ,buffer ,@body)))
+
 ;; TODO: Use function `string-pixel-width' after 29.1
 (defun chatgpt--string-pixel-width (str)
   "Return the width of STR in pixels."
@@ -220,7 +226,7 @@
   (when (timerp timer)
     (cancel-timer timer)))
 
-(defun chatgpt--pop-to-buffer (buffer-or-name)
+(defun chatgpt--display-buffer (buffer-or-name)
   "Wrapper to function `pop-to-buffer'.
 
 Display buffer from BUFFER-OR-NAME."
@@ -330,9 +336,8 @@ Display buffer from BUFFER-OR-NAME."
       (setq target (ht-size chatgpt-instances)))  ; Create a new one!
     target))
 
-(defun chatgpt-restart ()
+(defun chatgpt-restart-session ()
   "Restart session."
-  (interactive)
   (when (eq major-mode #'chatgpt-mode)
     (let* ((instance chatgpt-instance)
            (index    (car instance))
@@ -785,17 +790,22 @@ The data is consist of ROLE and CONTENT."
 ;;
 ;;; Entry
 
-(defun chatgpt-mode--kill-buffer-hook ()
+(defun chatgpt--clear-side-fields ()
+  "Kill side fileds."
+  (let ((instances chatgpt-instances))
+    (chatgpt--with-buffer chatgpt-input-buffer-name
+      (when (equal instances chatgpt-instances)
+        (kill-this-buffer)))
+    (chatgpt--with-buffer chatgpt-edit-buffer-name
+      (when (equal instances chatgpt-instances)
+        (kill-this-buffer)))))
+
+(defun chatgpt-mode--kill-buffer-hook (&rest _)
   "Kill buffer hook."
   (ht-clear chatgpt-data)
   (spinner-stop chatgpt-spinner)
   (chatgpt--cancel-text-timer)
-  (let ((instance chatgpt-instances))
-    (when (get-buffer chatgpt-input-buffer-name)
-      (with-current-buffer chatgpt-input-buffer-name
-        ;; kill input if it's the right session
-        (when (equal instance chatgpt-instances)
-          (kill-this-buffer))))))
+  (chatgpt--clear-side-fields))
 
 (defun chatgpt-header-line ()
   "The display for header line."
@@ -855,7 +865,7 @@ Caution, this will overwrite the existing instance!"
     (when (get-buffer new-buffer-name)
       (user-error "Internal Error: creating instance that already exists"))
     (chatgpt-register-instance new-index new-buffer-name)
-    (chatgpt--pop-to-buffer new-buffer-name)))
+    (chatgpt--display-buffer new-buffer-name)))
 
 ;;;###autoload
 (defun chatgpt ()
@@ -864,11 +874,28 @@ Caution, this will overwrite the existing instance!"
   (let ((live-instances  (chatgpt--live-instances))
         (shown-instances (chatgpt--shown-instances)))
     (cond (shown-instances
-           (chatgpt--pop-to-buffer (nth 0 shown-instances)))
+           (chatgpt--display-buffer (nth 0 shown-instances)))
           (live-instances
-           (chatgpt--pop-to-buffer (nth 0 live-instances)))
+           (chatgpt--display-buffer (nth 0 live-instances)))
           (t
            (chatgpt-new)))))
+
+;;;###autoload
+(defun chatgpt-restart ()
+  "Restart the current ChatGPT instance."
+  (interactive)
+  (save-window-excursion
+    (let ((instance
+           (cl-case major-mode
+             (`chatgpt-mode       (current-buffer))
+             (`chatgpt-input-mode (with-current-buffer chatgpt-input-buffer-name
+                                    (cdr chatgpt-input-instance)))
+             (`chatgpt-edit-mode  (with-current-buffer chatgpt-edit-buffer-name
+                                    (cdr chatgpt-edit-instance))))))
+      (when instance
+        (with-current-buffer instance
+          (chatgpt--clear-side-fields)
+          (chatgpt-restart-session))))))
 
 (provide 'chatgpt)
 ;;; chatgpt.el ends here
