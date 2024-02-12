@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/emacs-openai/openai/master/etc/light">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/emacs-openai/openai/master/etc/dark.png">
+  <img width="15%" src="" align="right">
+</picture>
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![JCS-ELPA](https://raw.githubusercontent.com/jcs-emacs/badges/master/elpa/v/chatgpt.svg)](https://jcs-emacs.github.io/jcs-elpa/#/chatgpt)
 
