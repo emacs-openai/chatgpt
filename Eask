@@ -1,3 +1,5 @@
+;; -*- mode: eask; lexical-binding: t -*-
+
 (package "chatgpt"
          "0.1.0"
          "Use ChatGPT inside Emacs")
