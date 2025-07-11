@@ -8,7 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## 0.2.0 (Unreleased)
 > Released N/A
 
-* Add text scroll animation (#3 and #4)
+* Add text scroll animation ([#3](../../pull/3) and [#4](../../pull/4))
 * Add edit mode ([`aa8b3eb`](../../commit/aa8b3eb9b3b0575c91702bfa74149274a194d31d))
 * Add display method option ([`3dba661`](../../commit/3dba6613b1fdd3b72f2563dee7a978b48e9e6abd))
 
