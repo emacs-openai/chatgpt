@@ -16,7 +16,7 @@
 (source 'gnu)
 (source 'melpa)
 
-(depends-on "emacs" "27.1")
+(depends-on "emacs" "28.1")
 (depends-on "openai")
 (depends-on "lv")
 (depends-on "ht")
