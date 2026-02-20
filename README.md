@@ -94,13 +94,19 @@ to insert a newline like a normal browser!
 
 - `chatgpt-model` - ID of the model to use. (Default: `"gpt-3.5-turbo"`)
 - `chatgpt-max-tokens` - The maximum number of tokens to generate in the completion. (Default: `2000`)
-- `chatgpt-temperature` - What sampling temperature to use. (Default: `1.0`)
+- `chatgpt-temperature` - What sampling temperature to use. If `nil` the value is not passed down to the OpenAI API. (Default: `nil`)
+- `chatgpt-top-p` - What nucleus sampling top_p value to use. If `nil` the value is not passed down to the OpenAI API. (Default: `nil`)
+- `chatgpt-reasoning-effort` - Constrains effort on reasoning for reasoning models. (Default: `nil`)
+- `chatgpt-reasoning-verbosity` - Constrains the verbosity of the model's response. (Default: `nil`)
+- `chatgpt-service-tier` - Specifies the processing type used for serving the request. (Default `nil`)
 - `chatgpt-input-method` - The method to receive input. (Default: `'window`)
 - `chatgpt-display-method` - The method to display buffer. (Default: `nil`)
 - `chatgpt-spinner-type` - Type of the spinner. (Default: `'moon`)
 - `chatgpt-display-tokens-info` - Non-nil we display tokens information for each request. (Default: `t`)
 - `chatgpt-animate-text` - Display text gradually instead of output it all at once. (Default: `t`)
 - `chatgpt-animate-fps` - Frame per seconds to display text animation. (Default: `5`)
+
+Some of these parametes only apply to reasoning models. For more details on the correct use of the parameters in relation to the model you are using please check the [API reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
 
 ## 🔗 References
 
