@@ -6,7 +6,7 @@
 ;; Maintainer: Shen, Jen-Chieh <jcs090218@gmail.com>
 ;; URL: https://github.com/emacs-openai/chatgpt
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "28.1") (openai "0.1.0") (lv "0.0") (ht "2.0") (markdown-mode "2.1") (spinner "1.7.4"))
+;; Package-Requires: ((emacs "28.1") (openai "0.1.1") (lv "0.0") (ht "2.0") (markdown-mode "2.1") (spinner "1.7.4"))
 ;; Keywords: comm openai
 
 ;; This file is not part of GNU Emacs.
@@ -57,14 +57,36 @@
   :type 'integer
   :group 'chatgpt)
 
-(defcustom chatgpt-temperature 1.0
+(defcustom chatgpt-temperature nil
   "What sampling temperature to use."
-  :type 'number
+  :type '(choice (const :tag "Don't set temperature." nil)
+                 (const :tag "Use custom temperature." number))
   :group 'chatgpt)
 
-(defcustom chatgpt-top-p 1.0
+(defcustom chatgpt-top-p nil
   "Nucleus sampling parameter."
-  :type 'number
+  :type '(choice (const :tag "Don't set top-p." nil)
+                 (const :tag "Use custom top-p." number))
+  :group 'chatgpt)
+
+(defcustom chatgpt-reasoning-effort nil
+  "The reasoning effort to use."
+  :type '(choice (const :tag "Don't set reasoning effort." nil)
+                 (const :tag "Use custom reasoning effort."
+                        (const :format "radio" none, minimal, low, medium, high, xhigh)))
+  :group 'chatgpt)
+
+(defcustom chatgpt-verbosity nil
+  "The verbosity to use."
+  :type '(choice (const :tag "Don't set verbosity." nil)
+                 (const :tag "Use custom verbosity." (const :format "radio" low, medium, high)))
+  :group 'chatgpt)
+
+(defcustom chatgpt-service-tier nil
+  "The service tier to use."
+  :type '(choice (const :tag "Don't set service tier." nil)
+                 (const :tag "Use custom service tier."
+                        (const :format "radio" auto, default, flex, scale, priority)))
   :group 'chatgpt)
 
 (defcustom chatgpt-input-method 'window
@@ -567,10 +589,13 @@ The data is consist of ROLE and CONTENT."
                        (chatgpt--display-messages)
                        (chatgpt--add-tokens data))))
                  :model chatgpt-model
-                 :max-tokens chatgpt-max-tokens
+                 :max-tokens-completion chatgpt-max-tokens
                  :temperature chatgpt-temperature
                  :top-p chatgpt-top-p
-                 :user user)))
+                 :reasoning-effort chatgpt-reasoning-effort
+                 :verbosity chatgpt-verbosity
+                 :service-tier chatgpt-service-tier
+                 :prompt-cache-key user)))
 
 (defun chatgpt-type-response ()
   "Type response to OpenAI."
@@ -809,11 +834,15 @@ The data is consist of ROLE and CONTENT."
 
 (defun chatgpt-header-line ()
   "The display for header line."
-  (format " %s[Session] %s  [History] %s  [User] %s"
+  (format " %s[Session] %s [Model] %s %s[History] %s [User] %s"
           (if-let ((frame (spinner-print chatgpt-spinner)))
               (concat frame " ")
             "")
           (cdr chatgpt-instance)
+          chatgpt-model
+          (if-let ((chatgpt-reasoning-effort chatgpt-reasoning-effort))
+              (format "[Effort] %s " chatgpt-reasoning-effort)
+            "")
           (length chatgpt-chat-history)
           (chatgpt-user)))
 
